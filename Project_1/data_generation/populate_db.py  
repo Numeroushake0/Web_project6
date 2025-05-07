@@ -1,0 +1,45 @@
+import random
+from faker import Faker
+import psycopg2
+from datetime import date
+from config import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST
+
+fake = Faker('uk_UA')
+conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST)
+cur = conn.cursor()
+
+groups = ['Група A', 'Група B', 'Група C']
+cur.executemany("INSERT INTO groups (name) VALUES (%s)", [(g,) for g in groups])
+
+teachers = [fake.name() for _ in range(5)]
+cur.executemany("INSERT INTO teachers (full_name) VALUES (%s)", [(t,) for t in teachers])
+
+subjects = ['Математика', 'Фізика', 'Хімія', 'Історія', 'Біологія', 'Англійська', 'Програмування']
+cur.execute("SELECT id FROM teachers")
+teacher_ids = [row[0] for row in cur.fetchall()]
+subject_records = [(subj, random.choice(teacher_ids)) for subj in subjects]
+cur.executemany("INSERT INTO subjects (name, teacher_id) VALUES (%s, %s)", subject_records)
+
+cur.execute("SELECT id FROM groups")
+group_ids = [row[0] for row in cur.fetchall()]
+students = [(fake.name(), random.choice(group_ids)) for _ in range(50)]
+cur.executemany("INSERT INTO students (full_name, group_id) VALUES (%s, %s)", students)
+
+cur.execute("SELECT id FROM students")
+student_ids = [row[0] for row in cur.fetchall()]
+cur.execute("SELECT id FROM subjects")
+subject_ids = [row[0] for row in cur.fetchall()]
+
+grades = []
+for student_id in student_ids:
+    for _ in range(random.randint(15, 20)):
+        subject_id = random.choice(subject_ids)
+        grade = random.randint(1, 12)
+        grade_date = fake.date_between(start_date='-6m', end_date='today')
+        grades.append((student_id, subject_id, grade, grade_date))
+
+cur.executemany("INSERT INTO grades (student_id, subject_id, grade, grade_date) VALUES (%s, %s, %s, %s)", grades)
+
+conn.commit()
+cur.close()
+conn.close()
